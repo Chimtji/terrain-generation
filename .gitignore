@@ -1,0 +1,90 @@
+# Unity Editor & Project
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+.vs/
+.vscode/
+*.csproj
+*.sln
+
+# Visual Studio cache/options
+.vs/
+.vscode/
+*.VC.db
+*.VC.db-shm
+*.VC.db-wal
+.idea/
+
+# JetBrains Rider IDE
+.idea/
+*.sln.iml
+*.DotSettings.user
+
+# Local development
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+._*
+
+# OS-specific
+*.log
+*.tmp
+.env.local
+
+# Unity-specific folders
+Assets/StreamingAssets/
+Assets/Plugins/*/
+
+# Generated files
+*.meta
+*.unitypackage
+*.unity3d
+
+# Burst compilation cache (DOTS)
+Burst/
+.burst/
+*.burst_cache
+BurstCache/
+
+# Package manager
+Packages/
+.packages/
+NuGetCache/
+*.nupkg
+
+# Local configuration (not shared)
+Assets/DevConfig/
+Local/
+local_settings.json
+
+# Test results
+TestResults/
+Coverage/
+.coverage/
+
+# Profiling & debug data (optional—adjust based on your needs)
+Profiler/
+*.prof
+*.json.profile
+.profile/
+
+# Build artifacts & installers
+*.exe
+*.msi
+*.apk
+*.ipa
+*.app
+
+# Editor temp (sometimes needed for debugging)
+# Uncomment if you want to share editor state across team:
+# ProjectSettings/
+# !ProjectSettings/EditorBuildSettings.asset
+# !ProjectSettings/QualitySettings.asset
