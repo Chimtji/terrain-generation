@@ -2,6 +2,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
+using UnityEngine;
 
 /// <summary>
 /// This system is responsible for generating the terrain chunks based on the TerrainData component.
@@ -57,6 +58,7 @@ public partial struct TerrainGenerationSystem : ISystem
             typeof(TerrainChunkNeedsGeneration),
             typeof(TerrainChunkNeedsMeshRendering),
             typeof(TerrainChunkReady),
+            typeof(TerrainChunkNoiseSettingsVersionData),
             typeof(Parent)
         );
 

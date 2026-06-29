@@ -6,16 +6,28 @@ using UnityEngine;
 
 [CreateAfter(typeof(TerrainGenerationSystem))]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
+[UpdateAfter(typeof(TerrainNoiseSettingsChangeDetectionSystem))]
 [BurstCompile]
 public partial struct TerrainChunkMeshGenerationSystem : ISystem
 {
     private EntityQuery _chunksQuery;
+    private EntityQuery _noiseSettingsQuery;
 
-    public void OnCreate(ref SystemState state) { }
+    public void OnCreate(ref SystemState state)
+    {
+        _chunksQuery = SystemAPI.QueryBuilder().WithAll<TerrainChunkNeedsGeneration>().Build();
+
+        _noiseSettingsQuery = SystemAPI.QueryBuilder().WithAll<TerrainNoiseSettingsData>().Build();
+
+        state.RequireForUpdate(_noiseSettingsQuery);
+        state.RequireForUpdate(_chunksQuery);
+    }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        Entity noiseSettingsEntity = _noiseSettingsQuery.GetSingletonEntity();
+
         state.Dependency = new GenerateChunkJob
         {
             NeedsGenerationLookup = SystemAPI.GetComponentLookup<TerrainChunkNeedsGeneration>(
@@ -24,37 +36,34 @@ public partial struct TerrainChunkMeshGenerationSystem : ISystem
             NeedsMeshRenderingLookup = SystemAPI.GetComponentLookup<TerrainChunkNeedsMeshRendering>(
                 false
             ),
+            NoiseSettingsLookup = SystemAPI.GetComponentLookup<TerrainNoiseSettingsData>(true),
+            NoiseSettingsEntity = noiseSettingsEntity,
         }.ScheduleParallel(state.Dependency);
     }
 
     [BurstCompile]
     private static void AddHeightToVertices(
         ref NativeArray<float3> vertices,
-        in float scale,
+        in TerrainNoiseSettingsData settings,
         in float3 worldPosition
     )
     {
-        const float noiseFrequency = 0.05f;
-
-        // Apply height variation based on Perlin noise
+        // ⭐ Now uses the dynamic noise settings instead of hardcoded values
         for (int i = 0; i < vertices.Length; i++)
         {
             float3 vertex = vertices[i];
 
-            // World-space position for noise sampling
-            // (worldPosition + local vertex position) to ensure seamless chunks
-            float2 noisePosition =
-                (
-                    new float2(worldPosition.x + vertex.x, worldPosition.z + vertex.z)
-                    * noiseFrequency
-                ) / scale;
+            float2 noisePosition = (
+                new float2(worldPosition.x + vertex.x, worldPosition.z + vertex.z)
+                * settings.frequency
+            );
 
-            // Sample Perlin noise
+            // ⭐ Use settings.amplitude and other parameters
             float noiseValue = PerlinNoise.Noise(noisePosition);
+            float heightAmount = (noiseValue - 0.5f) * settings.amplitude;
 
-            // Apply height: noise value * amplitude
-            // Adjust amplitude (e.g., 5) based on desired terrain height variation
-            float heightAmount = (noiseValue - 0.5f) * 10f; // Range: [-5, 5]
+            // ⭐ Apply offset
+            heightAmount += settings.offset;
 
             vertex.y += heightAmount;
             vertices[i] = vertex;
@@ -65,18 +74,24 @@ public partial struct TerrainChunkMeshGenerationSystem : ISystem
     [BurstCompile]
     public partial struct GenerateChunkJob : IJobEntity
     {
+        public Entity NoiseSettingsEntity;
+
         [NativeDisableParallelForRestriction]
         public ComponentLookup<TerrainChunkNeedsGeneration> NeedsGenerationLookup;
 
         [NativeDisableParallelForRestriction]
         public ComponentLookup<TerrainChunkNeedsMeshRendering> NeedsMeshRenderingLookup;
 
+        [ReadOnly]
+        public ComponentLookup<TerrainNoiseSettingsData> NoiseSettingsLookup;
+
         private void Execute(
             Entity entity,
             in TerrainChunkData chunkData,
             ref DynamicBuffer<TerrainVertexBufferData> vertexBuffer,
             ref DynamicBuffer<TerrainTriangleBufferData> triangleBuffer,
-            ref DynamicBuffer<TerrainUVBufferData> uvBuffer
+            ref DynamicBuffer<TerrainUVBufferData> uvBuffer,
+            ref TerrainChunkNoiseSettingsVersionData versionData
         )
         {
             // We create all the mesh data in native formats
@@ -94,11 +109,11 @@ public partial struct TerrainChunkMeshGenerationSystem : ISystem
             );
             NativeArray<float3>.Copy(meshData.vertices, heightMappedVertices);
 
-            AddHeightToVertices(
-                ref heightMappedVertices,
-                in chunkData.scale,
-                in chunkData.worldPosition
-            );
+            TerrainNoiseSettingsData settings = NoiseSettingsLookup
+                .GetRefRO(NoiseSettingsEntity)
+                .ValueRO;
+
+            AddHeightToVertices(ref heightMappedVertices, in settings, in chunkData.worldPosition);
 
             // The pre-allocated buffers are resized to fit the new data
             vertexBuffer.ResizeUninitialized(heightMappedVertices.Length);
@@ -131,6 +146,8 @@ public partial struct TerrainChunkMeshGenerationSystem : ISystem
 
             NeedsGenerationLookup.SetComponentEnabled(entity, false);
             NeedsMeshRenderingLookup.SetComponentEnabled(entity, true);
+
+            versionData.lastSeenSettingsVersion = settings.version;
         }
     }
 }
